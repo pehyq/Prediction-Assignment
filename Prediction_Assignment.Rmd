@@ -1,0 +1,125 @@
+---
+title: "Prediction Analysis of How Well Participants Perform Barbell Lift"
+author: "Amelia"
+date: "8 April 2017"
+output: html_document
+---
+
+## Assignment Requirements
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+More information is available from the website here: <http://groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+## Setting up
+In this analysis, "caret" package will be used. Set.seed is used to ensure reproducaible results. 
+```{r start}
+library(caret)
+require(randomForest)
+set.seed(12333)
+```
+
+## Data Cleaning
+The train and test data are loaded into R. Next, the data is cleaned to remove variables that are mostly NA, remove identifiation variables and remove vaiables that have low variance.
+
+```{r Cleaning, results='hide'}
+# Load data
+datatrain <- read.csv("pml-training.csv")
+datatest <- read.csv("pml-testing.csv")
+
+# Remove  variables with more than 90% NA
+NA_var  <- sapply(datatrain, function(x) mean(is.na(x))) < 0.90
+clean1 <- datatrain[, NA_var==TRUE]
+
+# Remove id variables
+clean2 <- clean1[, -(1:5)]
+
+# Remove variables with Nearly Zero Variance
+clean3 <- clean2[, -nearZeroVar(clean2)]
+
+# Remove highly correlated variables
+corrMatrix <- cor(na.omit(clean3[sapply(clean3, is.numeric)]))
+removecor = findCorrelation(corrMatrix, cutoff = .90, verbose = TRUE)
+clean4 = clean3[,-removecor]
+```
+
+## Output from Cleaning
+```{r, clean output}
+dim(clean4)
+```
+
+We have 47 variable left after cleaning. This is a large improvemnet from 160 variables as a large number of variables takes a lot of computing power to build the models.
+
+## Data Preprocessing
+The training data is split into testing and validation sets.
+```{r Preprocessing}
+# Split data into training and validation sets 
+intrain  <- createDataPartition(clean3$classe, p=0.7, list=FALSE)
+training <- clean4[intrain, ]
+validation <- clean4[-intrain, ]
+```
+
+## Prediction Model Building
+A few models will be built and tested in this section:
+
+1. Random forest
+
+2. Generalised Boosted Model
+
+3. Linear Discriminant Analysis
+
+### Random forest
+```{r rf}
+mod_rf <- randomForest(classe~.,data=training, ntree=100, importance=TRUE)
+pred_rf <- predict(mod_rf, validation)
+cm_rf <- confusionMatrix(pred_rf, validation$classe)
+cm_rf
+```
+
+
+### Generalised Boosted Model
+```{r gbm, results="hide"}
+mod_gbm <- train(classe~., data = training, method = "gbm")
+
+```
+
+
+```{r gbm result}
+pred_gbm <- predict(mod_gbm, validation)
+cm_gbm <- confusionMatrix(pred_gbm, validation$classe)
+cm_gbm
+```
+
+### Linear Discriminant Analysis
+```{r lda}
+mod_lda <- train(classe~., data = training, method = "lda")
+pred_lda <- predict(mod_lda, validation)
+cm_lda <- confusionMatrix(pred_lda, validation$classe)
+cm_lda
+```
+
+## Conclusion
+
+The best prediction is the random forest based on accuracy.The accuracy of the model far exceeded my expectations. In general when the acurracy is too good to be true, it could be due to overfitting. This will be clear if the test ase accuracy is much worse than the validation data.
+
+I look forward to see how it performs on test cases!
+
+## Test Cases
+
+```{r test}
+pred_test <- predict(mod_rf, datatest)
+pred_test
+```
+
+
